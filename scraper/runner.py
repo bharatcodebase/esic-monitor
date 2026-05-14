@@ -6,6 +6,7 @@ import db.client as db
 from scraper.sites.esic_scraper import scrape_site, SITES
 from scraper.base_scraper import log_event
 from datetime import datetime
+from notifications.telegram_channel import post_circular
 
 def add_to_notification_queue(circular_id):
     """Add newly found circular to notification queue."""
@@ -44,9 +45,10 @@ def run():
                 # Add to notification queue
                 circular_id = get_saved_circular_id(circular["url_hash"])
                 if circular_id:
-                    add_to_notification_queue(circular_id)
-                    total_new += 1
-                    print(f"  📬 Queued for Telegram: {circular['title'][:50]}...")
+                add_to_notification_queue(circular_id)
+                total_new += 1
+                print(f"  📬 Queued for Telegram: {circular['title'][:50]}...")
+                post_circular(circular)
 
             except Exception as e:
                 print(f"  ⚠️ Error saving circular: {e}")
