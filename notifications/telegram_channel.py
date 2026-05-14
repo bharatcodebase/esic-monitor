@@ -4,52 +4,63 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 import time
+import json
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
 
 def send_message(text):
-    """Send a message to the Telegram channel."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHANNEL_ID,
         "text": text,
         "parse_mode": "Markdown",
-        "disable_web_page_preview": False
+        "disable_web_page_preview": True
     }
     response = requests.post(url, json=payload)
     return response.json()
 
 def format_circular(circular):
-    """Format a circular into a Telegram message."""
     urgency = circular.get("urgency", "normal")
     emoji = "🚨" if urgency == "urgent" else "🔔"
 
-    title = circular.get("title", "No title")[:200]
+    title = circular.get("title", "No title")
     source = circular.get("source_site", "ESIC")
+    branch = circular.get("branch", "")
+    console_no = circular.get("console_no", "")
     date = circular.get("date_published", "N/A")
-    circular_url = circular.get("circular_url", "")
 
-    message = f"""
-{emoji} *New ESIC Circular*
+    # Build PDF links section
+    pdf_links = circular.get("pdf_links", "[]")
+    if isinstance(pdf_links, str):
+        pdf_links = json.loads(pdf_links)
 
-📄 *Title:* {title}
-🏢 *Source:* {source}
-📅 *Date:* {date}
+    docs_section = ""
+    if pdf_links:
+        docs_section = "\n\n📎 *Documents:*"
+        for i, pdf in enumerate(pdf_links, 1):
+            pdf_title = pdf["title"]
+            pdf_url = pdf["url"]
+            docs_section += f"\n{i}. [{pdf_title}]({pdf_url})"
 
-🔗 [View Circular]({circular_url})
+    message = f"""{emoji} *New ESIC Circular*
 
-#ESIC #{source.replace(" ", "")}
-""".strip()
+🏢 *Branch:* {branch}
+🔢 *Console No:* {console_no}
+📅 *Published:* {date}
+🏛 *Source:* {source}
+
+📄 *Subject:* {title}{docs_section}
+
+#ESIC #{source.replace(" ", "")}""".strip()
 
     return message
 
 def post_circular(circular):
-    """Format and post a circular to Telegram channel."""
     try:
         message = format_circular(circular)
         result = send_message(message)
 
         if result.get("ok"):
-            print(f"  ✅ Posted to Telegram: {circular['title'][:50]}...")
+            print(f"  ✅ Posted to Telegram: {circular.get('console_no', '')} {circular['title'][:40]}...")
             time.sleep(1)
             return True
         else:
@@ -61,15 +72,20 @@ def post_circular(circular):
         return False
 
 if __name__ == "__main__":
-    # Test with a sample circular
     test_circular = {
-        "title": "Test Circular — ESIC Monitor is Live!",
+        "title": "Monitoring, Management, and Disposal of Near-Expiry Medicines",
         "source_site": "ESIC HQ",
-        "date_published": "2026-05-14",
-        "circular_url": "https://esic.gov.in/circulars",
-        "urgency": "normal"
+        "branch": "RC Cell",
+        "console_no": "25449/2026",
+        "date_published": "2026-05-11",
+        "urgency": "normal",
+        "pdf_links": json.dumps([
+            {"title": "Main Circular PDF", "url": "https://esic.gov.in/circular1.pdf"},
+            {"title": "Enclosures Related Circular", "url": "https://esic.gov.in/circular2.pdf"},
+            {"title": "Guidance document by CDSCO", "url": "https://esic.gov.in/circular3.pdf"}
+        ])
     }
-    print("Sending test message to channel...")
+    print("Sending test message...")
     result = post_circular(test_circular)
     if result:
         print("✅ Test successful — check your Telegram channel!")

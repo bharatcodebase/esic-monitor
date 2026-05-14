@@ -2,22 +2,31 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+import json
 from bs4 import BeautifulSoup
-from scraper.base_scraper import fetch_page, hash_url, circular_exists, log_event
+from scraper.base_scraper import fetch_page, hash_url, log_event
 import db.client as db
 from datetime import datetime
+
+def circular_exists_by_console(console_no, source_site):
+    """Check if circular already exists using console number."""
+    result = db.get("circulars", {
+        "console_no": f"eq.{console_no}",
+        "source_site": f"eq.{source_site}"
+    })
+    return len(result) > 0
 
 def scrape_site(url, site_name):
     """Scrape circulars from any ESIC site."""
     print(f"\n🔍 Scraping: {site_name}")
-    
+
     html = fetch_page(url)
     if not html:
         print(f"  ❌ Could not fetch {site_name}")
         return []
 
     soup = BeautifulSoup(html, "html.parser")
-    
+
     # Find the circulars table
     table = soup.find("table")
     if not table:
@@ -36,54 +45,73 @@ def scrape_site(url, site_name):
             continue
 
         try:
+            # Extract data from columns
             branch = cols[1].get_text(strip=True)
-            circular_no_date = cols[2].get_text(strip=True)
             publish_date = cols[4].get_text(strip=True)
             console_no = cols[5].get_text(strip=True) if len(cols) > 5 else ""
 
-            # Get all PDF links in subject column
+            # Skip if no console number
+            if not console_no:
+                continue
+
+            # Skip if already exists
+            if circular_exists_by_console(console_no, site_name):
+                continue
+
+            # Get all PDF links from subject column
             subject_col = cols[3]
             links = subject_col.find_all("a", href=True)
 
             if not links:
                 continue
 
-            for link in links:
+            # Collect all PDFs for this circular
+            pdf_links = []
+            main_title = ""
+
+            for i, link in enumerate(links):
                 title = link.get_text(strip=True)
                 href = link["href"]
 
                 # Build full URL if relative
                 if href.startswith("/"):
                     base = "/".join(url.split("/")[:3])
-                    circular_url = base + href
+                    pdf_url = base + href
                 elif href.startswith("http"):
-                    circular_url = href
+                    pdf_url = href
                 else:
-                    circular_url = url + "/" + href
+                    pdf_url = url + "/" + href
 
-                # Skip non-PDF links
-                if not any(x in circular_url.lower() for x in [".pdf", "download", "view"]):
-                    if not any(x in title.lower() for x in ["pdf", "circular", "order"]):
-                        continue
+                # First link is the main circular title
+                if i == 0:
+                    main_title = title
 
-                url_hash = hash_url(circular_url)
-
-                # Skip if already exists
-                if circular_exists(url_hash):
-                    continue
-
-                circular_data = {
-                    "url_hash": url_hash,
+                pdf_links.append({
                     "title": title,
-                    "circular_url": circular_url,
-                    "source_site": site_name,
-                    "date_published": publish_date,
-                    "date_found": datetime.utcnow().isoformat(),
-                    "telegram_posted": False
-                }
+                    "url": pdf_url
+                })
 
-                new_circulars.append(circular_data)
-                print(f"  ✅ New: {title[:60]}...")
+            if not pdf_links:
+                continue
+
+            # Use console_no as unique hash
+            url_hash = hash_url(console_no + site_name)
+
+            circular_data = {
+                "url_hash": url_hash,
+                "title": main_title,
+                "circular_url": pdf_links[0]["url"],
+                "source_site": site_name,
+                "branch": branch,
+                "console_no": console_no,
+                "pdf_links": json.dumps(pdf_links),
+                "date_published": publish_date,
+                "date_found": datetime.utcnow().isoformat(),
+                "telegram_posted": False
+            }
+
+            new_circulars.append(circular_data)
+            print(f"  ✅ New: [{console_no}] {main_title[:50]}... ({len(pdf_links)} PDFs)")
 
         except Exception as e:
             print(f"  ⚠️ Error parsing row: {e}")
@@ -119,5 +147,5 @@ if __name__ == "__main__":
                 db.insert("circulars", circular)
                 total += 1
             except Exception as e:
-                print(f"  ⚠️ Could not save circular: {e}")
-    print(f"\n✅ Total new circulars saved to DB: {total}")
+                print(f"  ⚠️ Could not save: {e}")
+    print(f"\n✅ Total new circulars saved: {total}")
