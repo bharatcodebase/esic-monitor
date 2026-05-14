@@ -3,6 +3,7 @@ name: ESIC Circular Monitor
 on:
   schedule:
     - cron: '*/20 * * * *'
+    - cron: '30 3 * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,4 +28,8 @@ jobs:
           TELEGRAM_ADMIN_ID: ${{ secrets.TELEGRAM_ADMIN_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
-        run: python scraper/runner.py
+        run: |
+          python scraper/runner.py
+          if [ "$(date -u +%H:%M)" = "03:30" ]; then
+            python failsafe/health.py
+          fi
