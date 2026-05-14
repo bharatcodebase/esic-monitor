@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
+import time
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
 
 def send_message(text):
@@ -49,6 +50,7 @@ def post_circular(circular):
 
         if result.get("ok"):
             print(f"  ✅ Posted to Telegram: {circular['title'][:50]}...")
+            time.sleep(1)
             return True
         else:
             print(f"  ❌ Telegram error: {result.get('description')}")
