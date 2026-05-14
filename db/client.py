@@ -21,9 +21,10 @@ def get(table, filters=None):
 
 def insert(table, data):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
-    response = requests.post(url, headers=HEADERS, json=data)
+    headers = {**HEADERS, "Prefer": "return=minimal"}
+    response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
-    return response.json()
+    return True
 
 def update(table, filters, data):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
