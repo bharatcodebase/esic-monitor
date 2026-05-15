@@ -2,15 +2,19 @@ name: ESIC Circular Monitor
 
 on:
   schedule:
-    - cron: '0,20,40 2-15 * * 1-6'
-    - cron: '30 3 * * *'
+    - cron: '0,30 2-15 * * 1-6'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
+    concurrency:
+      group: esic-monitor
+      cancel-in-progress: false
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +39,9 @@ jobs:
           if [ "$(date -u +%H:%M)" = "03:30" ]; then
             python failsafe/health.py
           fi
+
       - name: Keep repo active
+        continue-on-error: true
         run: |
           echo "Last run: $(date)" > last_run.txt
           git config user.email "action@github.com"
