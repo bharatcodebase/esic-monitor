@@ -48,7 +48,11 @@ def run():
                     add_to_notification_queue(circular_id)
                     total_new += 1
                     print(f"  📬 Queued for Telegram: {circular['title'][:50]}...")
-                    post_circular(circular)
+                    success = post_circular(circular)
+                    if success:
+                        db.update("notification_queue", 
+                            {"circular_id": f"eq.{circular_id}"}, 
+                            {"resolved": True})
 
             except Exception as e:
                 print(f"  ⚠️ Error saving circular: {e}")
