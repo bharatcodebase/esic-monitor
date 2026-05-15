@@ -48,4 +48,5 @@ jobs:
           git config user.name "GitHub Action"
           git add last_run.txt
           git diff --staged --quiet || git commit -m "chore: keep alive"
+          git pull --rebase origin main
           git push
