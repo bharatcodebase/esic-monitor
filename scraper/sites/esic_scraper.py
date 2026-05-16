@@ -8,16 +8,43 @@ from scraper.base_scraper import fetch_page, hash_url, log_event
 import db.client as db
 from datetime import datetime
 
+
+# All sites to monitor with their column mappings
+SITES = [
+    {
+        "url": "https://esic.gov.in/circulars",
+        "name": "ESIC HQ",
+        "cols": {"branch": 1, "subject": 3, "date": 4, "console": 5}
+    },
+    {
+        "url": "https://dmd.esic.gov.in/circulars/esichospital_circular_list",
+        "name": "ESIC DMD",
+        "cols": {"branch": 1, "subject": 3, "date": 4, "console": 5}
+    },
+    {
+        "url": "https://rodelhi.esic.gov.in/circulars/rosro_circular_list",
+        "name": "ESIC RO Delhi",
+        "cols": {"branch": 1, "subject": 3, "date": 4, "console": 5}
+    },
+    {
+        "url": "https://esic.gov.in/newsevents",
+        "name": "ESIC News & Events",
+        "cols": {"branch": 1, "subject": 2, "date": 3, "console": 4}
+    },
+]
+
+
 def circular_exists_by_console(console_no, source_site):
-    """Check if circular already exists using console number."""
+    """Check if circular already exists using console number + source site."""
     result = db.get("circulars", {
         "console_no": f"eq.{console_no}",
         "source_site": f"eq.{source_site}"
     })
     return len(result) > 0
 
-def scrape_site(url, site_name):
-    """Scrape circulars from any ESIC site."""
+
+def scrape_site(url, site_name, col_map):
+    """Scrape circulars from any ESIC site using provided column mapping."""
     print(f"\n🔍 Scraping: {site_name}")
 
     html = fetch_page(url)
@@ -41,14 +68,17 @@ def scrape_site(url, site_name):
 
     for row in rows:
         cols = row.find_all("td")
-        if len(cols) < 5:
+
+        # Ensure minimum columns exist based on the highest index needed
+        min_cols = max(col_map.values()) + 1
+        if len(cols) < min_cols:
             continue
 
         try:
-            # Extract data from columns
-            branch = cols[1].get_text(strip=True)
-            publish_date = cols[4].get_text(strip=True)
-            console_no = cols[5].get_text(strip=True) if len(cols) > 5 else ""
+            # Extract data using column map
+            branch = cols[col_map["branch"]].get_text(strip=True)
+            publish_date = cols[col_map["date"]].get_text(strip=True)
+            console_no = cols[col_map["console"]].get_text(strip=True)
 
             # Skip if no console number
             if not console_no:
@@ -59,7 +89,7 @@ def scrape_site(url, site_name):
                 continue
 
             # Get all PDF links from subject column
-            subject_col = cols[3]
+            subject_col = cols[col_map["subject"]]
             links = subject_col.find_all("a", href=True)
 
             if not links:
@@ -82,7 +112,7 @@ def scrape_site(url, site_name):
                 else:
                     pdf_url = url + "/" + href
 
-                # First link is the main circular title
+                # First link is the main title
                 if i == 0:
                     main_title = title
 
@@ -94,7 +124,7 @@ def scrape_site(url, site_name):
             if not pdf_links:
                 continue
 
-            # Use console_no as unique hash
+            # Use console_no + site_name as unique hash
             url_hash = hash_url(console_no + site_name)
 
             circular_data = {
@@ -121,27 +151,10 @@ def scrape_site(url, site_name):
     return new_circulars
 
 
-# All 3 sites to monitor
-SITES = [
-    {
-        "url": "https://esic.gov.in/circulars",
-        "name": "ESIC HQ"
-    },
-    {
-        "url": "https://dmd.esic.gov.in/circulars/esichospital_circular_list",
-        "name": "ESIC DMD"
-    },
-    {
-        "url": "https://rodelhi.esic.gov.in/circulars/rosro_circular_list",
-        "name": "ESIC RO Delhi"
-    }
-]
-
-
 if __name__ == "__main__":
     total = 0
     for site in SITES:
-        circulars = scrape_site(site["url"], site["name"])
+        circulars = scrape_site(site["url"], site["name"], site["cols"])
         for circular in circulars:
             try:
                 db.insert("circulars", circular)

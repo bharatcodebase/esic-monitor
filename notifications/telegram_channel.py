@@ -7,6 +7,13 @@ import time
 import json
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
 
+# Heading map — add new sites here if needed
+SITE_HEADINGS = {
+    "ESIC News & Events": "New ESIC News & Event",
+}
+DEFAULT_HEADING = "New ESIC Circular"
+
+
 def send_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -18,12 +25,15 @@ def send_message(text):
     response = requests.post(url, json=payload)
     return response.json()
 
+
 def format_circular(circular):
     urgency = circular.get("urgency", "normal")
     emoji = "🚨" if urgency == "urgent" else "🔔"
 
-    title = circular.get("title", "No title")
     source = circular.get("source_site", "ESIC")
+    heading = SITE_HEADINGS.get(source, DEFAULT_HEADING)
+
+    title = circular.get("title", "No title")
     branch = circular.get("branch", "")
     console_no = circular.get("console_no", "")
     date = circular.get("date_published", "N/A")
@@ -41,7 +51,7 @@ def format_circular(circular):
             pdf_url = pdf["url"]
             docs_section += f"\n{i}. [{pdf_title}]({pdf_url})"
 
-    message = f"""{emoji} *New ESIC Circular*
+    message = f"""{emoji} *{heading}*
 
 🏢 *Branch:* {branch}
 🔢 *Console No:* {console_no}
@@ -50,9 +60,10 @@ def format_circular(circular):
 
 📄 *Subject:* {title}{docs_section}
 
-#ESIC #{source.replace(" ", "")}""".strip()
+#ESIC #{source.replace(" ", "").replace("&", "")}""".strip()
 
     return message
+
 
 def post_circular(circular):
     try:
@@ -70,6 +81,7 @@ def post_circular(circular):
     except Exception as e:
         print(f"  ❌ Failed to post: {e}")
         return False
+
 
 if __name__ == "__main__":
     test_circular = {

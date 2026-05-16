@@ -8,6 +8,7 @@ from scraper.base_scraper import log_event
 from datetime import datetime
 from notifications.telegram_channel import post_circular
 
+
 def add_to_notification_queue(circular_id):
     """Add newly found circular to notification queue."""
     try:
@@ -19,12 +20,14 @@ def add_to_notification_queue(circular_id):
     except Exception as e:
         print(f"  ⚠️ Could not add to queue: {e}")
 
+
 def get_saved_circular_id(url_hash):
     """Get the DB id of a saved circular."""
     result = db.get("circulars", {"url_hash": f"eq.{url_hash}"})
     if result:
         return result[0]["id"]
     return None
+
 
 def run():
     print(f"\n{'='*50}")
@@ -34,8 +37,8 @@ def run():
     total_new = 0
 
     for site in SITES:
-        # Scrape the site
-        new_circulars = scrape_site(site["url"], site["name"])
+        # Scrape the site — pass col_map from SITES config
+        new_circulars = scrape_site(site["url"], site["name"], site["cols"])
 
         for circular in new_circulars:
             try:
@@ -50,8 +53,8 @@ def run():
                     print(f"  📬 Queued for Telegram: {circular['title'][:50]}...")
                     success = post_circular(circular)
                     if success:
-                        db.update("notification_queue", 
-                            {"circular_id": f"eq.{circular_id}"}, 
+                        db.update("notification_queue",
+                            {"circular_id": f"eq.{circular_id}"},
                             {"resolved": True})
 
             except Exception as e:
@@ -61,6 +64,7 @@ def run():
     print(f"\n{'='*50}")
     print(f"✅ Run complete. {total_new} new circulars queued.")
     print(f"{'='*50}\n")
+
 
 if __name__ == "__main__":
     run()
