@@ -9,6 +9,17 @@ import db.client as db
 from datetime import datetime
 
 
+def parse_date(date_str):
+    """Convert DD/MM/YYYY to YYYY-MM-DD. Return as-is if already correct format."""
+    try:
+        if "/" in date_str:
+            day, month, year = date_str.split("/")
+            return f"{year}-{month}-{day}"
+        return date_str
+    except:
+        return date_str
+
+
 # All sites to monitor with their column mappings
 SITES = [
     {
@@ -77,7 +88,7 @@ def scrape_site(url, site_name, col_map):
         try:
             # Extract data using column map
             branch = cols[col_map["branch"]].get_text(strip=True)
-            publish_date = cols[col_map["date"]].get_text(strip=True)
+            publish_date = parse_date(cols[col_map["date"]].get_text(strip=True))
             console_no = cols[col_map["console"]].get_text(strip=True)
 
             # Skip if no console number

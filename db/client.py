@@ -30,7 +30,7 @@ def update(table, filters, data):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
     response = requests.patch(url, headers=HEADERS, params=filters, json=data)
     response.raise_for_status()
-    return response.json()
+    return True
 
 if __name__ == "__main__":
     print("✅ DB client ready")
