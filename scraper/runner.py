@@ -37,8 +37,13 @@ def run():
     total_new = 0
 
     for site in SITES:
-        # Scrape the site — pass col_map from SITES config
-        new_circulars = scrape_site(site["url"], site["name"], site["cols"])
+        # Scrape the site — pass col_map and pagination_base from SITES config
+        new_circulars = scrape_site(
+            site["url"],
+            site["name"],
+            site["cols"],
+            site["pagination_base"]
+        )
 
         for circular in new_circulars:
             try:

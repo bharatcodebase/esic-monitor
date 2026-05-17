@@ -13,6 +13,9 @@ SITE_HEADINGS = {
 }
 DEFAULT_HEADING = "New ESIC Circular"
 
+TELEGRAM_MAX_LENGTH = 4096
+TELEGRAM_SAFE_LENGTH = 3900  # Leave buffer for safety
+
 
 def send_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -43,25 +46,36 @@ def format_circular(circular):
     if isinstance(pdf_links, str):
         pdf_links = json.loads(pdf_links)
 
+    # Build header first (always included)
+    header = (
+        f"{emoji} *{heading}*\n\n"
+        f"🏢 *Branch:* {branch}\n"
+        f"🔢 *Console No:* {console_no}\n"
+        f"📅 *Published:* {date}\n"
+        f"🏛 *Source:* {source}\n\n"
+        f"📄 *Subject:* {title}"
+    )
+
+    footer = f"\n\n#ESIC #{source.replace(' ', '').replace('&', '')}"
+
+    # Build PDF links — add one by one until length limit approached
     docs_section = ""
     if pdf_links:
         docs_section = "\n\n📎 *Documents:*"
         for i, pdf in enumerate(pdf_links, 1):
             pdf_title = pdf["title"]
             pdf_url = pdf["url"]
-            docs_section += f"\n{i}. [{pdf_title}]({pdf_url})"
+            new_line = f"\n{i}. [{pdf_title}]({pdf_url})"
 
-    message = f"""{emoji} *{heading}*
+            # Check if adding this line would exceed safe length
+            test_message = header + docs_section + new_line + footer
+            if len(test_message) > TELEGRAM_SAFE_LENGTH:
+                docs_section += f"\n_(+{len(pdf_links) - i + 1} more documents — see original link)_"
+                break
 
-🏢 *Branch:* {branch}
-🔢 *Console No:* {console_no}
-📅 *Published:* {date}
-🏛 *Source:* {source}
+            docs_section += new_line
 
-📄 *Subject:* {title}{docs_section}
-
-#ESIC #{source.replace(" ", "").replace("&", "")}""".strip()
-
+    message = (header + docs_section + footer).strip()
     return message
 
 
