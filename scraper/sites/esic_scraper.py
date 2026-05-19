@@ -182,13 +182,14 @@ def scrape_site(url, site_name, col_map, pagination_base):
 
         all_new_circulars.extend(new_circulars)
 
-        # Stop paginating if no new circulars on this page — rest will be older
-        if len(new_circulars) == 0:
-            print(f"  ⏹ No new circulars on page {page_num} — stopping pagination")
+        # Stop if new circulars are less than total rows — means older records exist on this page
+        # Only continue if ALL rows on this page are new — more new ones may exist on next page
+        if len(new_circulars) < total_rows:
+            print(f"  ⏹ {len(new_circulars)}/{total_rows} new on page {page_num} — older records found, stopping pagination")
             break
 
         if page_num < MAX_PAGES:
-            print(f"  ➡️ Found {len(new_circulars)} new — checking page {page_num + 1}")
+            print(f"  ➡️ All {len(new_circulars)} rows new on page {page_num} — checking page {page_num + 1}")
 
     print(f"  📊 {len(all_new_circulars)} new circulars found on {site_name}")
     return all_new_circulars
