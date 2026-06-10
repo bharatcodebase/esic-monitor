@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
+import time
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -23,6 +24,8 @@ from config import GEMINI_API_KEY
 MODEL = "gemini-2.5-flash"        # bump to a newer flash model here when desired
 TEXT_THRESHOLD = 200              # chars of extracted text below which we treat the PDF as scanned
 MAX_PDF_BYTES = 18 * 1024 * 1024  # inline-data guard (~18MB); larger PDFs are skipped
+AI_RETRIES = 3                    # attempts on transient Gemini errors (overload / rate limit)
+AI_RETRY_DELAYS = [5, 15]         # seconds to wait between attempts
 
 PROMPT = (
     "You are summarizing an official ESIC (Employees' State Insurance Corporation, India) circular. "
@@ -63,26 +66,42 @@ def _extract_text(pdf_bytes):
     return text.strip()
 
 
+def _generate(client, contents):
+    """Call Gemini, retrying on transient overload / rate-limit errors."""
+    last_err = None
+    for attempt in range(AI_RETRIES):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            return response.text
+        except Exception as e:
+            last_err = e
+            code = getattr(e, "code", None)
+            msg = str(e)
+            transient = code in (429, 500, 503) or any(
+                s in msg for s in ("503", "429", "500", "UNAVAILABLE", "overloaded", "high demand")
+            )
+            if not transient or attempt == AI_RETRIES - 1:
+                break
+            wait = AI_RETRY_DELAYS[min(attempt, len(AI_RETRY_DELAYS) - 1)]
+            print(f"  ⏳ Gemini busy ({code or 'transient'}) — retry {attempt + 1}/{AI_RETRIES - 1} in {wait}s")
+            time.sleep(wait)
+    raise last_err
+
+
 def _summarize_text(client, text):
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[PROMPT, "\n\nDocument text:\n" + text],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
-    return response.text
+    return _generate(client, [PROMPT, "\n\nDocument text:\n" + text])
 
 
 def _summarize_pdf(client, pdf_bytes):
     # Gemini OCRs scanned PDFs natively from the raw bytes
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[
-            PROMPT,
-            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
-        ],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
-    return response.text
+    return _generate(client, [
+        PROMPT,
+        types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+    ])
 
 
 def _parse(raw):
