@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests python-dotenv supabase==1.2.0
+        run: pip install requests python-dotenv
 
       - name: Send health ping
         env:
