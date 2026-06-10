@@ -64,6 +64,17 @@ def format_circular(circular):
 
     footer = f"\n\n#ESIC #{source.replace(' ', '').replace('&', '')}"
 
+    # Bilingual AI summary (optional — present only if generated)
+    summary_en = circular.get("summary_en", "")
+    summary_hi = circular.get("summary_hi", "")
+    summary_section = ""
+    if summary_en or summary_hi:
+        summary_section = "\n\n📝 <b>Summary:</b>"
+        if summary_en:
+            summary_section += f"\n{esc(summary_en)}"
+        if summary_hi:
+            summary_section += f"\n\n🇮🇳 {esc(summary_hi)}"
+
     # Build PDF links — add one by one until length limit approached
     docs_section = ""
     if pdf_links:
@@ -74,14 +85,14 @@ def format_circular(circular):
             new_line = f'\n{i}. <a href="{esc(pdf_url)}">{esc(pdf_title)}</a>'
 
             # Check if adding this line would exceed safe length
-            test_message = header + docs_section + new_line + footer
+            test_message = header + summary_section + docs_section + new_line + footer
             if len(test_message) > TELEGRAM_SAFE_LENGTH:
                 docs_section += f"\n<i>(+{len(pdf_links) - i + 1} more documents — see original link)</i>"
                 break
 
             docs_section += new_line
 
-    message = (header + docs_section + footer).strip()
+    message = (header + summary_section + docs_section + footer).strip()
     return message
 
 

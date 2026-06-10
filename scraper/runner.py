@@ -7,6 +7,7 @@ from scraper.sites.esic_scraper import scrape_site, SITES
 from scraper.base_scraper import log_event
 from datetime import datetime
 from notifications.telegram_channel import post_circular
+from ai.summarizer import generate_summary
 from config import MAX_QUEUE_RETRIES
 
 
@@ -100,6 +101,12 @@ def run():
 
         for circular in new_circulars:
             try:
+                # Generate bilingual AI summary (best-effort — never blocks posting)
+                summary = generate_summary(circular)
+                if summary:
+                    circular["summary_en"] = summary["summary_en"]
+                    circular["summary_hi"] = summary["summary_hi"]
+
                 # Save to DB
                 db.insert("circulars", circular)
 
