@@ -90,14 +90,14 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return
     try:
-        circulars = db.get("circulars", {})
-        queue = db.get("notification_queue", {"resolved": "eq.false"})
-        urls = db.get("monitored_urls", {"active": "eq.true"})
+        url_count = db.count("monitored_urls", {"active": "eq.true"})
+        circ_count = db.count("circulars")
+        queue_count = db.count("notification_queue", {"resolved": "eq.false"})
         msg = (
             f"📊 *System Status*\n\n"
-            f"🌐 Sites monitored: {len(urls)}\n"
-            f"📄 Total circulars: {len(circulars)}\n"
-            f"📬 Pending queue: {len(queue)}\n"
+            f"🌐 Sites monitored: {url_count}\n"
+            f"📄 Total circulars: {circ_count}\n"
+            f"📬 Pending queue: {queue_count}\n"
             f"🕐 Checked: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
         )
         await update.message.reply_text(msg, parse_mode="Markdown")

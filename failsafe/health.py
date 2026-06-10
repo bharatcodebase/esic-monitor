@@ -21,26 +21,26 @@ def send_admin_message(text):
 def daily_health_ping():
     """Send daily status report to admin."""
     try:
-        # Get stats
-        all_circulars = db.get("circulars", {})
-        pending_queue = db.get("notification_queue", {"resolved": "eq.false"})
-        active_urls = db.get("monitored_urls", {"active": "eq.true"})
-
-        # Circulars found in last 24 hours
+        # Last-24h window, filtered server-side
         yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
-        recent = [c for c in all_circulars if c.get("date_found", "") >= yesterday]
+
+        # Exact counts via count header (no 1000-row ceiling)
+        total_circulars = db.count("circulars")
+        recent_count = db.count("circulars", {"date_found": f"gte.{yesterday}"})
+        pending_count = db.count("notification_queue", {"resolved": "eq.false"})
+        active_url_count = db.count("monitored_urls", {"active": "eq.true"})
 
         # Build status message
         status = "✅ All systems operational"
-        if len(pending_queue) > 10:
+        if pending_count > 10:
             status = "⚠️ High pending queue — check notifications"
 
         message = (
             f"🌅 *ESIC Monitor — Daily Status*\n\n"
-            f"📊 Circulars (last 24h): {len(recent)}\n"
-            f"💾 Total in DB: {len(all_circulars)}\n"
-            f"📬 Pending queue: {len(pending_queue)}\n"
-            f"🌐 Sites monitored: {len(active_urls)}\n"
+            f"📊 Circulars (last 24h): {recent_count}\n"
+            f"💾 Total in DB: {total_circulars}\n"
+            f"📬 Pending queue: {pending_count}\n"
+            f"🌐 Sites monitored: {active_url_count}\n"
             f"🕐 Report time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC\n\n"
             f"{status}"
         )

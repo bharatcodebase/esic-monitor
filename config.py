@@ -19,7 +19,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
 
 # Scraper settings
-SCRAPE_INTERVAL_MINUTES = 20
+# NOTE: the real schedule is the cron in .github/workflows/scraper.yml
+# (currently every 30 min, hours 2-15 UTC, Mon-Sat). This constant is
+# documentation only and is not read by the scraper.
+SCRAPE_INTERVAL_MINUTES = 30
 MAX_RETRIES = 3
 RETRY_DELAYS = [5, 15, 30]
 

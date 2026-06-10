@@ -7,6 +7,7 @@ from scraper.sites.esic_scraper import scrape_site, SITES
 from scraper.base_scraper import log_event
 from datetime import datetime
 from notifications.telegram_channel import post_circular
+from config import MAX_QUEUE_RETRIES
 
 
 def add_to_notification_queue(circular_id):
@@ -29,10 +30,62 @@ def get_saved_circular_id(url_hash):
     return None
 
 
+def process_queue():
+    """Re-send notifications that failed on a previous run (safety net)."""
+    try:
+        pending = db.get("notification_queue", {"resolved": "eq.false"})
+    except Exception as e:
+        print(f"  ⚠️ Could not read notification queue: {e}")
+        return
+
+    if not pending:
+        return
+
+    print(f"\n🔁 Retrying {len(pending)} unresolved notification(s)...")
+
+    for item in pending:
+        attempt = item.get("attempt_count", 0)
+        circular_id = item.get("circular_id")
+
+        # Give up after MAX_QUEUE_RETRIES — auto-clear and record why
+        if attempt >= MAX_QUEUE_RETRIES:
+            db.update("notification_queue",
+                {"circular_id": f"eq.{circular_id}"},
+                {
+                    "resolved": True,
+                    "failed": True,
+                    "last_error": f"Gave up after {MAX_QUEUE_RETRIES} attempts"
+                })
+            log_event("error", None, "failed",
+                      f"Notification permanently failed for circular {circular_id}")
+            print(f"  🛑 Gave up on circular {circular_id} after {MAX_QUEUE_RETRIES} attempts")
+            continue
+
+        result = db.get("circulars", {"id": f"eq.{circular_id}"})
+        if not result:
+            print(f"  ⚠️ Circular {circular_id} not found — skipping")
+            continue
+
+        success = post_circular(result[0])
+        if success:
+            db.update("notification_queue",
+                {"circular_id": f"eq.{circular_id}"},
+                {"resolved": True})
+            print(f"  ✅ Retry delivered: circular {circular_id}")
+        else:
+            db.update("notification_queue",
+                {"circular_id": f"eq.{circular_id}"},
+                {"attempt_count": attempt + 1})
+            print(f"  ❌ Retry {attempt + 1}/{MAX_QUEUE_RETRIES} failed: circular {circular_id}")
+
+
 def run():
     print(f"\n{'='*50}")
     print(f"🚀 Runner started: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
     print(f"{'='*50}")
+
+    # Safety net: re-send any notifications that failed on a previous run
+    process_queue()
 
     total_new = 0
 

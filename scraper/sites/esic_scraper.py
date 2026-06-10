@@ -44,8 +44,8 @@ def parse_date(date_str):
     """Convert DD/MM/YYYY to YYYY-MM-DD. Return as-is if already correct format."""
     try:
         if "/" in date_str:
-            day, month, year = date_str.split("/")
-            return f"{year}-{month}-{day}"
+            day, month, year = [part.strip() for part in date_str.split("/")]
+            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
         return date_str
     except:
         return date_str

@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import requests
 import time
 import json
+import html
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
 
 # Heading map — add new sites here if needed
@@ -17,12 +18,17 @@ TELEGRAM_MAX_LENGTH = 4096
 TELEGRAM_SAFE_LENGTH = 3900  # Leave buffer for safety
 
 
+def esc(text):
+    """Escape dynamic values for Telegram HTML parse mode (&, <, > only)."""
+    return html.escape(str(text), quote=False)
+
+
 def send_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHANNEL_ID,
         "text": text,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
     response = requests.post(url, json=payload)
@@ -48,12 +54,12 @@ def format_circular(circular):
 
     # Build header first (always included)
     header = (
-        f"{emoji} *{heading}*\n\n"
-        f"🏢 *Branch:* {branch}\n"
-        f"🔢 *Console No:* {console_no}\n"
-        f"📅 *Published:* {date}\n"
-        f"🏛 *Source:* {source}\n\n"
-        f"📄 *Subject:* {title}"
+        f"{emoji} <b>{esc(heading)}</b>\n\n"
+        f"🏢 <b>Branch:</b> {esc(branch)}\n"
+        f"🔢 <b>Console No:</b> {esc(console_no)}\n"
+        f"📅 <b>Published:</b> {esc(date)}\n"
+        f"🏛 <b>Source:</b> {esc(source)}\n\n"
+        f"📄 <b>Subject:</b> {esc(title)}"
     )
 
     footer = f"\n\n#ESIC #{source.replace(' ', '').replace('&', '')}"
@@ -61,16 +67,16 @@ def format_circular(circular):
     # Build PDF links — add one by one until length limit approached
     docs_section = ""
     if pdf_links:
-        docs_section = "\n\n📎 *Documents:*"
+        docs_section = "\n\n📎 <b>Documents:</b>"
         for i, pdf in enumerate(pdf_links, 1):
             pdf_title = pdf["title"]
             pdf_url = pdf["url"]
-            new_line = f"\n{i}. [{pdf_title}]({pdf_url})"
+            new_line = f'\n{i}. <a href="{esc(pdf_url)}">{esc(pdf_title)}</a>'
 
             # Check if adding this line would exceed safe length
             test_message = header + docs_section + new_line + footer
             if len(test_message) > TELEGRAM_SAFE_LENGTH:
-                docs_section += f"\n_(+{len(pdf_links) - i + 1} more documents — see original link)_"
+                docs_section += f"\n<i>(+{len(pdf_links) - i + 1} more documents — see original link)</i>"
                 break
 
             docs_section += new_line
@@ -99,7 +105,7 @@ def post_circular(circular):
 
 if __name__ == "__main__":
     test_circular = {
-        "title": "Monitoring, Management, and Disposal of Near-Expiry Medicines",
+        "title": "Order_2026 (rev) [final] *draft*",
         "source_site": "ESIC HQ",
         "branch": "RC Cell",
         "console_no": "25449/2026",
