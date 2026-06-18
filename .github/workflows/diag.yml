@@ -1,0 +1,20 @@
+name: Connectivity Diagnostic
+
+on:
+  workflow_dispatch:   # manual trigger only — no schedule
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test ESIC sites from the runner
+        run: |
+          for url in \
+            "https://esic.gov.in/circulars" \
+            "https://dmd.esic.gov.in/circulars/esichospital_circular_list" \
+            "https://rodelhi.esic.gov.in/circulars/rosro_circular_list" \
+            "https://esic.gov.in/newsevents"; do
+            echo "================================================"
+            echo "Testing: $url"
+            curl -v --max-time 30 "$url" -o /dev/null || echo ">>> FAILED: $url"
+          done
